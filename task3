@@ -1,0 +1,101 @@
+<?php
+// dashboard.php — Task 3 (Search + Pagination)
+
+session_start();
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// DB connection
+$host = 'localhost';
+$db = 'blog';
+$user = 'root';
+$pass = '';
+$conn = new mysqli($host, $user, $pass, $db);
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Handle Search
+$search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : "";
+
+// Pagination setup
+$limit = 5; // posts per page
+$page = isset($_GET['page']) ? max((int)$_GET['page'], 1) : 1;
+$offset = ($page - 1) * $limit;
+
+// Total posts
+$countQuery = "SELECT COUNT(*) AS total FROM posts";
+if (!empty($search)) {
+    $countQuery .= " WHERE title LIKE '%$search%' OR content LIKE '%$search%'";
+}
+$total = $conn->query($countQuery)->fetch_assoc()['total'];
+$totalPages = ceil($total / $limit);
+
+// Fetch posts
+$query = "SELECT * FROM posts";
+if (!empty($search)) {
+    $query .= " WHERE title LIKE '%$search%' OR content LIKE '%$search%'";
+}
+$query .= " ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
+$result = $conn->query($query);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - Blog</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        h2 { color: teal; }
+        input[type="text"] { padding: 5px; width: 250px; }
+        a { text-decoration: none; color: #007BFF; margin-right: 10px; }
+        a:hover { text-decoration: underline; }
+        .pagination a { margin: 0 3px; }
+        hr { margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<h2>Welcome, <?= htmlspecialchars($_SESSION['user']) ?>!</h2>
+<a href="create.php">+ Add New Post</a> | 
+<a href="logout.php">Logout</a>
+
+<form method="get" style="margin-top: 20px;">
+    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search posts...">
+    <button type="submit">Search</button>
+</form>
+
+<hr>
+
+<?php
+if ($result->num_rows == 0) {
+    echo "<p>No posts found.</p>";
+} else {
+    while ($row = $result->fetch_assoc()) {
+        echo "<h3>" . htmlspecialchars($row['title']) . "</h3>";
+        echo "<p>" . nl2br(htmlspecialchars($row['content'])) . "</p>";
+        echo "<small>Posted on: {$row['created_at']}</small><br>";
+        echo "<a href='edit.php?id={$row['id']}'>Edit</a>";
+        echo "<a href='delete.php?id={$row['id']}'>Delete</a>";
+        echo "<hr>";
+    }
+}
+?>
+
+<!-- Pagination Links -->
+<?php if ($totalPages > 1): ?>
+    <div class="pagination">
+        Pages:
+        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+            <a href="?search=<?= urlencode($search) ?>&page=<?= $i ?>" 
+               style="<?= $i == $page ? 'font-weight:bold;' : '' ?>">
+                <?= $i ?>
+            </a>
+        <?php endfor; ?>
+    </div>
+<?php endif; ?>
+
+</body>
+</html>
